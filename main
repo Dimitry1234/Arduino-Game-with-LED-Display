@@ -1,0 +1,141 @@
+#include <LiquidCrystal.h>
+
+// Initialisierung des LCD (RS, E, D4, D5, D6, D7)
+LiquidCrystal lcd(0, 1, 2, 11, 12, 13);
+
+// LED Pins für binären Zähler
+int ledPins[] = {8, 7, 6, 5}; // LEDs in Reihenfolge 8 - 4 - 2 - 1
+
+// Status-LEDs
+int ledStartPin = 4;  // LED bei Start
+int ledCollisionPin = 3;  // LED bei Kollision
+
+// Tasten für Hoch und Runter
+int buttonUpPin = 9;    // Button "hoch"
+int buttonDownPin = 10; // Button "runter"
+
+// Spielfigur und Hindernisse
+int characterX = 1;       // Die X-Position des Charakters (immer an der 3. Stelle von links)
+int characterY = 1;       // Die Y-Position des Charakters (wird durch die Tasten gesteuert)
+const int maxObstacles = 3; // Maximale Anzahl an Hindernissen
+int obstacles[maxObstacles][2]; // Hindernisse [X, Y] Positionen
+
+int counter = 0;          // Binärer Zähler
+bool gameOver = false;    // Wenn das Spiel vorbei ist
+
+// Zähler als Binärwert anzeigen
+void displayBinaryCounter(int counter) {
+  for (int i = 0; i < 4; i++) {
+    digitalWrite(ledPins[i], (counter & (1 << (3 - i))) ? HIGH : LOW); // LEDs entsprechend Bit setzen
+  }
+}
+
+// Hindernisse initialisieren
+void initializeObstacles() {
+  for (int i = 0; i < maxObstacles; i++) {
+    obstacles[i][0] = random(10, 16); // Zufällige X-Position
+    obstacles[i][1] = random(0, 2);  // Zufällige Y-Position
+  }
+}
+
+// Hindernisse bewegen
+void moveObstacles() {
+  for (int i = 0; i < maxObstacles; i++) {
+    obstacles[i][0]--;
+    if (obstacles[i][0] < 0) {
+      obstacles[i][0] = 15;          // Hindernis zurücksetzen
+      obstacles[i][1] = random(0, 2); // Zufällige Y-Position
+      counter++;                      // Zähler erhöhen, wenn Hindernis passiert
+    }
+  }
+}
+
+// Überprüfung auf Kollision mit Hindernissen
+bool checkCollision() {
+  for (int i = 0; i < maxObstacles; i++) {
+    if (characterX == obstacles[i][0] && characterY == obstacles[i][1]) {
+      return true;
+    }
+  }
+  return false;
+}
+
+// Spielfigur und Hindernisse auf dem Display zeichnen
+void drawGame() {
+  lcd.clear();  // Lösche das Display
+
+  // Spielfigur zeichnen
+  if (!gameOver) {
+    lcd.setCursor(characterX, characterY);
+    lcd.print("O");
+  }
+
+  // Hindernisse zeichnen
+  for (int i = 0; i < maxObstacles; i++) {
+    lcd.setCursor(obstacles[i][0], obstacles[i][1]);
+    lcd.print("X");
+  }
+}
+
+void setup() {
+  // LEDs initialisieren
+  for (int i = 0; i < 4; i++) {
+    pinMode(ledPins[i], OUTPUT);
+  }
+  pinMode(ledStartPin, OUTPUT);
+  pinMode(ledCollisionPin, OUTPUT);
+
+  // Tasten initialisieren
+  pinMode(buttonUpPin, INPUT_PULLUP);  // Pull-up-Widerstand für Button "hoch"
+  pinMode(buttonDownPin, INPUT_PULLUP); // Pull-up-Widerstand für Button "runter"
+
+  // LCD initialisieren
+  lcd.begin(16, 2);
+
+  // Startanzeige
+  lcd.print("Start!");
+  digitalWrite(ledStartPin, HIGH);
+  delay(1000);
+  digitalWrite(ledStartPin, LOW);
+
+  // Hindernisse initialisieren
+  initializeObstacles();
+}
+
+void loop() {
+  if (gameOver) {
+    // Kollision: LED an Pin 3 einschalten und grüne LED ausschalten
+    digitalWrite(ledCollisionPin, HIGH);
+    digitalWrite(ledStartPin, LOW);
+    delay(1000);  // Kurze Pause
+    return;
+  }
+
+  // Tasten lesen
+  if (digitalRead(buttonUpPin) == LOW && characterY > 0) { // LOW, weil Pull-up-Widerstand aktiv
+    characterY--;  // Bewege den Charakter nach oben
+    delay(200);    // Entprellung
+  }
+
+  if (digitalRead(buttonDownPin) == LOW && characterY < 1) { // LOW, weil Pull-up-Widerstand aktiv
+    characterY++;  // Bewege den Charakter nach unten
+    delay(200);    // Entprellung
+  }
+
+  // Hindernisse bewegen
+  moveObstacles();
+
+  // Überprüfe auf Kollision
+  if (checkCollision()) {
+    gameOver = true;
+    return;
+  }
+
+  // Spiel zeichnen
+  drawGame();
+
+  // Binären Zähler anzeigen
+  displayBinaryCounter(counter);
+
+  delay(200);  // Kurze Pause
+}
